@@ -175,6 +175,10 @@ class InteractiveInventoryGame:
             # 步骤完成标记
             st.session_state.step_completed = [False] * 10
 
+            # 添加步骤6和步骤7的完成标记
+            st.session_state.order_submitted = False
+            st.session_state.simulation_run = False
+
             # 分数系统
             st.session_state.score = 0
             st.session_state.score_details = []
@@ -879,15 +883,27 @@ def render_step_6_order():
                             'cost': qty * product.cost
                         }
                 st.session_state.cash -= total_cost
+                st.session_state.order_submitted = True  # 标记订单已提交
                 st.success(f"✅ 订单提交成功！共花费¥{total_cost:.2f}")
                 st.balloons()
         else:
             st.error("❌ 资金不足！请调整订货量")
+    else:
+        # 如果没有需要订货的商品，直接标记为已完成
+        st.session_state.order_submitted = True
 
     if no_order_items:
         st.markdown("#### ✅ 库存充足，暂不需要订货的商品")
         for item in no_order_items:
             st.info(f"{item} - 库存高于重订货点")
+
+    # 显示当前状态
+    if st.session_state.order_submitted:
+        st.markdown("""
+        <div class="success-message">
+            <strong>✅ 订单处理完成，可以进入下一步了！</strong>
+        </div>
+        """, unsafe_allow_html=True)
 
 
 def render_step_7_run():
@@ -924,6 +940,7 @@ def render_step_7_run():
     # 运行按钮
     if st.button("▶️ 开始营业", type="primary", use_container_width=True):
         report = game.process_daily_sales()
+        st.session_state.simulation_run = True  # 标记模拟已运行
 
         # 显示结果
         st.markdown("### 📊 经营结果")
@@ -965,6 +982,14 @@ def render_step_7_run():
 
         df_status = pd.DataFrame(status_data)
         st.dataframe(df_status, hide_index=True, use_container_width=True)
+
+    # 显示当前状态
+    if st.session_state.simulation_run:
+        st.markdown("""
+        <div class="success-message">
+            <strong>✅ 营业日已完成，可以查看分析报告了！</strong>
+        </div>
+        """, unsafe_allow_html=True)
 
 
 def render_step_8_report():
@@ -1219,6 +1244,11 @@ def main():
         if current_step > 0:
             if st.button("⬅️ 上一步", use_container_width=True):
                 st.session_state.current_step -= 1
+                # 重置下一步的完成标记
+                if st.session_state.current_step == 5:
+                    st.session_state.order_submitted = False
+                elif st.session_state.current_step == 6:
+                    st.session_state.simulation_run = False
                 st.rerun()
 
     with col3:
@@ -1259,6 +1289,14 @@ def main():
                     proceed_hint = f"请完成以下商品的订货量输入：{', '.join(missing_orders)}"
                 else:
                     proceed_hint = ""
+
+            elif current_step == 6:  # 确认订单步骤
+                can_proceed = st.session_state.order_submitted
+                proceed_hint = "请先确认提交订单" if not can_proceed else ""
+
+            elif current_step == 7:  # 运行模拟步骤
+                can_proceed = st.session_state.simulation_run
+                proceed_hint = "请先点击'开始营业'运行模拟" if not can_proceed else ""
 
             if can_proceed:
                 if st.button("➡️ 下一步", type="primary", use_container_width=True):
